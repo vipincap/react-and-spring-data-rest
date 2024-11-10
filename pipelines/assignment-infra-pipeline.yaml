@@ -1,0 +1,45 @@
+pr: none
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+parameters:
+  - name: environment
+    displayName: "Environment"
+    type: string
+    default: "dev"
+    values:
+      - "dev"
+      - "test"
+
+  - name: action
+    displayName: "Action"
+    type: string
+    default: "apply"
+    values:
+      - plan
+      - apply
+      - destroy
+
+variables:
+  - template: ../config/common.yaml
+  - template: ../config/${{ parameters.environment }}.yaml
+stages:
+  - stage: deploy_terraform_resource_${{ parameters.environment }}
+    displayName: "Deploy container app infra-${{ parameters.environment }}"
+    jobs:
+      - template: "templates/jobs/deploy-terraform.yaml"
+        parameters:
+          job_name: deploy_terraform_${{ parameters.environment }}
+          environment: ${{ parameters.environment }}
+          backend_resource_group: ${{ variables.backend_resource_group_name }}
+          backend_storage_account: ${{ variables.backend_storage_infra_name }}
+          backend_service_arm: ${{ variables. backend_service_connection }}
+          backend_arm_container: ${{ variables.infra_container }}
+          terraform_state: infra.tfstate
+          terraform_path: stages/infrastructure
+          action: ${{ parameters.action }}
+          service_connection: ${{ variables.service_connection }}
+          terraform_vars: >-
+            -var "environment=${{ parameters.environment }}"

@@ -1,0 +1,22 @@
+variables:
+  # pipeline variables
+  service_connection: "assignment-dev"
+  backend_service_connection: "assignment-dev"
+  spn_app_id: "<<spn apllication ID >>"
+  spn_obj_id: "<<spn object id>>"
+
+  # servive connection for docker container registory
+  service_connection_acr: resistory-dev
+  container_registory_name: assignmentwedev
+  container_image_name: react-and-spring-data-rest
+  container_image_tag: latest
+  container_registory_sku: Basic
+  containerAppName: assignment-app-name-we-dev
+  infra_rg_name: rg-infra-we-dev-01
+
+  # Resource for backend
+  backend_resource_group_name: rg-backend-infra-dev
+  backend_storage_infra_name: stassignwedev
+
+  # Log analytics
+  log_analytics_name: log-analytics-dev

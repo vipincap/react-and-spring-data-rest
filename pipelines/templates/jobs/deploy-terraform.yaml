@@ -1,0 +1,95 @@
+parameters:
+  - name: environment
+    type: string
+  - name: backend_resource_group
+    type: string
+  - name: backend_storage_account
+    type: string
+  - name: backend_service_arm
+    type: string
+  - name: backend_arm_container
+    type: string
+  - name: terraform_state
+    type: string
+  - name: terraform_path
+    type: string
+  - name: action
+    type: string
+  - name: service_connection
+    type: string
+  - name: job_name
+    type: string
+  - name: terraform_vars
+    type: string
+    default: ""
+jobs:
+  - job: infra_deploy_${{ parameters.environment }}
+    displayName: Deploy infra on ${{ parameters.environment }}
+    workspace:
+      clean: all
+    steps:
+      - checkout: self
+        clean: true
+      - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@1
+        displayName: "Install Terraform"
+        inputs:
+          terraformVersion: "1.9.8" # Version specified as a string
+
+      - task: TerraformTaskV4@4
+        displayName: "Terraform init"
+        inputs:
+          command: "init"
+          commandOptions: "-reconfigure"
+          backendServiceArm: "${{ parameters.backend_service_arm }}"
+          backendAzureRmResourceGroupName: "${{ parameters.backend_resource_group }}"
+          backendAzureRmStorageAccountName: "${{ parameters.backend_storage_account }}"
+          backendAzureRmContainerName: "${{ parameters.backend_arm_container }}"
+          backendAzureRmKey: "${{ parameters.terraform_state }}"
+          workingDirectory: "$(System.DefaultWorkingDirectory)/${{ parameters.terraform_path }}"
+
+      - task: TerraformTaskV4@4
+        displayName: "Terraform validate"
+        condition: and(succeeded(), ne('${{ parameters.action }}', 'destroy'))
+        inputs:
+          command: "validate"
+          workingDirectory: "$(System.DefaultWorkingDirectory)/${{ parameters.terraform_path }}"
+
+      # plan
+      - ${{ if eq(parameters.action, 'plan') }}:
+          - task: TerraformTaskV4@4
+            displayName: "Terraform plan"
+            retryCountOnTaskFailure: 0
+            inputs:
+              command: "plan"
+              commandOptions: "-input=false ${{ parameters.terraform_vars }}"
+              environmentServiceNameAzureRM: "${{ parameters.service_connection }}"
+              workingDirectory: "$(System.DefaultWorkingDirectory)/${{ parameters.terraform_path }}"
+
+      # Apply
+      - ${{ else }}:
+          - task: TerraformTaskV4@4
+            displayName: "Terraform apply"
+            retryCountOnTaskFailure: 1
+            inputs:
+              command: ${{ parameters.action }}
+              commandOptions: "-input=false -auto-approve ${{ parameters.terraform_vars }}"
+              environmentServiceNameAzureRM: "${{ parameters.service_connection }}"
+              workingDirectory: "$(System.DefaultWorkingDirectory)/${{ parameters.terraform_path }}"
+      # Output
+      - task: TerraformTaskV4@4
+        displayName: "Terraform Output"
+        inputs:
+          command: "custom"
+          customCommand: "output"
+          commandOptions: "-json"
+          outputTo: "file"
+          fileName: "$(System.DefaultWorkingDirectory)/output.json"
+          environmentServiceNameAzureRM: "${{ parameters.service_connection }}"
+          workingDirectory: "$(System.DefaultWorkingDirectory)/${{ parameters.terraform_path }}"
+
+      - task: PublishBuildArtifacts@1
+        displayName: "publish Terraform Output"
+        inputs:
+          PathtoPublish: "$(System.DefaultWorkingDirectory)/output.json"
+          ArtifactName: "$(system.StageName)-${{ parameters.job_name}}-output"
+          publishLocation: "pipeline"

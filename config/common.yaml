@@ -1,0 +1,6 @@
+variables:
+  location_short: we
+  infra_container: app-infra
+  location: westeurope
+
+  # define other variable which is common across env

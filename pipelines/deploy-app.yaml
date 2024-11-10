@@ -1,0 +1,67 @@
+pr: none
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+parameters:
+  - name: environment
+    displayName: "Environment"
+    type: string
+    default: "dev"
+    values:
+      - "dev"
+      - "test"
+      - "prod"
+
+variables:
+  - template: ../config/common.yaml
+  - template: ../config/${{ parameters.environment }}.yaml
+stages:
+  - stage: Build_Application_${{ parameters.environment }}
+    displayName: "Build Application-${{ parameters.environment }}"
+    jobs:
+      - job:
+        displayName: Build_Application
+        steps:
+          - checkout: self
+          - task: Maven@4
+            displayName: clean package
+            inputs:
+              mavenPomFile: "pom.xml"
+              goals: "clean install"
+              publishJUnitResults: true
+              testResultsFiles: "**/surefire-reports/TEST-*.xml"
+              javaHomeOption: "JDKVersion"
+              mavenVersionOption: "Default"
+              mavenAuthenticateFeed: false
+              effectivePomSkip: false
+              sonarQubeRunAnalysis: false
+
+          - task: Docker@2
+            displayName: "Build and Push Docker image"
+            inputs:
+              command: "buildAndPush"
+              containerRegistry: ${{ variables.service_connection_acr }}
+              repository: "react-and-spring-data-rest"
+              tags: |
+                $(Build.BuildId)
+                latest
+              Dockerfile: "$(Build.SourcesDirectory)/Dockerfile"
+
+  - stage: DeployToContainerApp
+    jobs:
+      - deployment: DeployContainer
+        displayName: "Deploy Docker Image to Azure container App"
+        dependsOn: Build_Application_${{ parameters.environment }}
+        condition: succeeded()
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureContainerApps@1
+                  inputs:
+                    azureSubscription: ${{ variables.service_connection }}
+                    containerAppName: ${{ variables.containerAppName }}
+                    resourceGroup: ${{ variables.infra_rg_name }}
+                    imageToDeploy: "${{ variables.container_registory_name }}.azurecr.io/${{ variables.container_image_name }}:${{ variables.container_image_tag }}"

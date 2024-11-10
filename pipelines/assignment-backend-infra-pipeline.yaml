@@ -1,0 +1,34 @@
+pr: none
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+parameters:
+  - name: environment
+    displayName: "Environment"
+    type: string
+    default: "dev"
+    values:
+      - "dev"
+      - "test"
+      - "prod"
+variables:
+  - template: ../config/common.yaml
+  - template: ../config/${{ parameters.environment }}.yaml
+stages:
+  - stage: deploy_bicep_resource_${{ parameters.environment }}
+    displayName: "Deploy Bicep Resource - ${{ parameters.environment }}"
+    jobs:
+      - template: "templates/jobs/deploy-bicep.yaml"
+        parameters:
+          environment: ${{ parameters.environment }}
+          bicep_directory: stages/foundation
+          location: ${{ variables.location }}
+          spn_obj_id: ${{ variables.spn_obj_id }}
+          resource_group_name: ${{ variables.backend_resource_group_name }}
+          storage_account_name: ${{ variables.backend_storage_infra_name }}
+          backend_service_arm: ${{ variables.service_connection }}
+          container_names: ${{ variables.infra_container }}
+          acrName: ${{ variables.container_registory_name }}
+          acrSku: ${{ variables.container_registory_sku }}
+          workspaceName: ${{ variables.log_analytics_name }}

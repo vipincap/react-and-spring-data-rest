@@ -1,0 +1,50 @@
+parameters:
+  - name: environment
+    type: string
+  - name: bicep_directory
+    type: string
+  - name: location
+    type: string
+  - name: spn_obj_id
+    type: string
+  - name: resource_group_name
+    type: string
+  - name: storage_account_name
+    type: string
+  - name: backend_service_arm
+    type: string
+  - name: container_names
+    type: string
+  - name: acrName
+    type: string
+  - name: acrSku
+    type: string
+  - name: workspaceName
+    type: string
+jobs:
+  - job: bicep_deploy_${{ parameters.environment }}
+    displayName: Deploy Bicep on ${{ parameters.environment }}
+    steps:
+      - checkout: self
+      - task: AzureCLI@2
+        displayName: Deploy Bicep Template
+        inputs:
+          azureSubscription: ${{ parameters.backend_service_arm }}
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            echo "Deploying Bicep Template to ${{ parameters.environment }} in location ${{ parameters.location }}"
+
+            az deployment sub create \
+              --name  Deploy-RG-ST-${{ parameters.environment }}-${{ parameters.location }} \
+              --template-file  ${{ parameters.bicep_directory }}/main.bicep \
+              --location  ${{ parameters.location }} \
+              --parameters \
+                location="${{ parameters.location }}" \
+                objectId="${{ parameters.spn_obj_id }}" \
+                resourceGroupName="${{ parameters.resource_group_name }}" \
+                storageAccountName="${{ parameters.storage_account_name }}" \
+                storageAccountContainerNames="${{ parameters.container_names }}" \
+                acrName="${{ parameters.acrName }}" \
+                acrSku="${{ parameters.acrSku }}" \
+                workspaceName="${{ parameters.workspaceName }}"
